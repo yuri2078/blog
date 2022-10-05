@@ -18,20 +18,34 @@ keywords:
 
 ## 写代码的要求
 
-+ 尽可能的使用const 修饰代码
-  + 避免无意识中修改变量导致出错
-  + 使他能够接受const 和 非const 参数
-  + 是4程序能够正常生成 临时变量 --- 引用的时候
-+ 命名规则
-  + 小驼峰 myPoint
-  + 大驼峰 MyPoint
-  + 匈牙利 my_point
-  + `__`  和 `_`开头的命令被保留给实现，一般不用
-+ 不使用using namespace std
-  + 使用 using std::cout;
-  + 使用 using std::cin;
-+ 使用容器的时候包含头文件
-  + iostream 包含了string 但 自己还是包含一下
+### 尽可能的使用const 修饰代码
+
++ 避免无意识中修改变量导致出错
++ 使他能够接受const 和 非const 参数
++ 是4程序能够正常生成 临时变量 --- 引用的时候
+
+### 命名规则
+
++ 小驼峰 myPoint
++ 大驼峰 MyPoint
++ 匈牙利 my_point
++ `__`  和 `_`开头的命令被保留给实现，一般不用
+
+### 不使用using namespace std
+
++ 使用 using std::cout;
++ 使用 using std::cin;
+
+### 使用容器的时候包含头文件
+
++ iostream 包含了string 但 自己还是包含一下
+
+### 给函数传递参数时的选择
+
+1. 当传递类或者结构体这种数据量大的数据时一般选择 引用传递
+2. 传递数组时 智能选择指针
+3. 当传递普通数据类型的变量是 选择值传递
+4. 传递
 
 
 
@@ -246,29 +260,131 @@ int main(int argc, char **argv)
 
 ### 函数指针
 
+### 智能指针
+
+- **std::unique_ptr** 独占指针
+    1. 在任何给定的时刻只能有一指针管理内存
+    2. 在超出作用域后，指针将会释放内存
+    3. 只能move 不能 copy
+- **std::shard_ptr** 计数指针
+    1. 他可以copy
+    2. 可以计数 赋值一次 计数器加一，销毁一次计数器减一
+    3. unique_ptr 可以传递给shard_ptr 但是shard不能传递给unique_ptr
+    4. 拥有计数方法 .use_count() 统计指针被复制的次数。 被删除一次则加一
+- **std::weak_ptr** 
+    1. 没有所有权
+    2. 不能解引用和使用箭头函数
+    3. 一般用于标识别的对象信息，用shard和unique会释放掉内存   
+
+详细列子
+
 ```c++
 #include <iostream>
+#include <memory>
 
-int max(int x, int y)
+class Person
 {
-    return x > y ? x : y;
+private:
+    
+public:
+    std::string name{"hello"};
+    
+    Person(); //默认调用函数
+    Person(const std::string &name);
+    void set_name(const std::string &name);
+    ~Person();
+    Person(const Person &&p);
+};
+
+Person::Person() 
+{
+    std::cout << "name : " << name << "  Person 类创建\n";
 }
 
-void test()
+Person::Person(const std::string &name) : name(name)
 {
-    std::cout << "void test \n";
+    std::cout << "name : " << name << "  Person 类创建\n";
+}
+
+Person::~Person()
+{
+    std::cout << "name : " << name << "  Person 类析构\n";
+}
+
+void Person::set_name(const std::string &name)
+{
+    this->name = name;
+}
+Person::Person(const Person &&p)
+{
+    std::cout << "移动构造函数调用\n";
+    this->name = p.name;
+}
+
+void test_0()
+{
+    Person p1; //会自己调用析构函数
+    Person *p2 = new Person; //不会自己调用析构函数
+    delete p2; //需要自己调用
+}
+
+void unique_ptr()
+{
+    //创建方式1 使用原始指针创建
+    Person *p = new Person;
+    std::unique_ptr<Person> u_p{p}; //通过原始指针创建
+
+    //独占指针需要满足条件1 这里两个都能调用不满足，把它指向空
+    p = nullptr;
+
+    std::cout << "u_p : name --- " << u_p->name << std::endl; //正常调用，函数结束后自己会调用析构函数
+
+    
+    //创建方式2 使用new 创建
+    std::unique_ptr<Person> u_p_2{new Person("yuri")};
+    
+    //创建方式3 使用std::make 创建
+
+    std::unique_ptr<Person> u_p_3 =  std::make_unique<Person>("yuri is yes");
+
+    std::cout << "u_p_2.get() : " << u_p_2.get() << std::endl; //打印地址
+    //打印的是指针指向的地址，而不是& 打印指针的地址
+
+    std::unique_ptr<Person> up = std::make_unique<Person>("yuri");
+    auto hello = std::move(up); //只能通过move使用
+    // auto hello = up; 报错，无法复制，只能move
+}
+
+void shared_ptr()
+{
+    std::shared_ptr<int> int_1 = std::make_shared<int>(100);
+    std::cout << "(1 cout = " << int_1.use_count() << std::endl;
+    auto int_2 = int_1; //复制一次计数器加一
+    std::cout << "(1 cout = " << int_1.use_count() << std::endl; //指向同一个地方，计数器都变成2
+    std::cout << "(2 cout = " << int_2.use_count() << std::endl;
+
+    int_1.reset(); //释放一次
+    std::cout << "(1 cout = " << int_1.use_count() << std::endl; //已经删除了，计数器编程0
+    std::cout << "(2 cout = " << int_2.use_count() << std::endl; //这里不变，因为原来的删除，所以减一变成0了
+    //在函数里面调用的时候会加一，出来之后又会不变
+}
+
+void weak_ptr()
+{
+    //没有所有权
+    //不能解引用和使用箭头函数
+    //一般用于标识别的对象信息，用shard和unique会释放掉内存
+    auto p = std::make_shared<Person>();
+    std::weak_ptr<Person> weak_p(p);
+    // p->name; 错误无法调用
+    
 }
 
 int main(int argc, char const *argv[])
 {
-    int (*pf)(int, int); //定义函数指针
-    pf = max;
-    std::cout << "max -- " << pf(55, 66) << std::endl;
-    void (*pm)() = test; //定义函数指针
-    pm(); //调用函数指针
+    unique_ptr(); //独占指针
+    shared_ptr(); //计数指针
     return 0;
 }
-
 ```
-
 
