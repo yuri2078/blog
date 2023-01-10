@@ -27,6 +27,8 @@ sudo apt-get upgrade
 
 ## 安装docker
 
+> 如果提示curl 未知 直接终端输入 `sudo apt-get install curl` 就行
+
 ```bash
 wget http://apollo-pkg-beta.bj.bcebos.com/docker_install.sh
 bash docker_install.sh
